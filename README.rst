@@ -33,3 +33,6 @@ Tags will show up for you automatically in forms and the admin.
 For more info check out the documentation.  And for questions about usage or
 development you can contact the
 `mailinglist <http://groups.google.com/group/django-taggit>`_.
+
+Includes changes made in `shacker/django-taggit <https://github.com/shacker/django-taggit>` to add case insensitivity as a setting. 
+
