@@ -35,12 +35,10 @@ class TagBase(models.Model):
             while True:
                 i += 1
                 try:
-                    sid = transaction.savepoint(**trans_kwargs)
-                    res = super(TagBase, self).save(*args, **kwargs)
-                    transaction.savepoint_commit(sid, **trans_kwargs)
+                    with transaction.atomic():
+                        res = super(TagBase, self).save(*args, **kwargs)
                     return res
                 except IntegrityError:
-                    transaction.savepoint_rollback(sid, **trans_kwargs)
                     self.slug = self.slugify(self.name, i)
         else:
             return super(TagBase, self).save(*args, **kwargs)
