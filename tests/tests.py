@@ -1,10 +1,14 @@
 from __future__ import unicode_literals, absolute_import
 
 from unittest import TestCase as UnitTestCase
+try:
+    from unittest import skipIf, skipUnless
+except:
+    from django.utils.unittest import skipIf, skipUnless
 
 import django
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core import serializers
 from django.db import connection
 from django.test import TestCase, TransactionTestCase
@@ -13,14 +17,14 @@ from django.utils.encoding import force_text
 
 from django.contrib.contenttypes.models import ContentType
 
-from taggit.managers import TaggableManager, _model_name
+from taggit.managers import TaggableManager, _TaggableManager, _model_name
 from taggit.models import Tag, TaggedItem
 from .forms import (FoodForm, DirectFoodForm, CustomPKFoodForm,
     OfficialFoodForm)
 from .models import (Food, Pet, HousePet, DirectFood, DirectPet,
     DirectHousePet, TaggedPet, CustomPKFood, CustomPKPet, CustomPKHousePet,
     TaggedCustomPKPet, OfficialFood, OfficialPet, OfficialHousePet,
-    OfficialThroughModel, OfficialTag, Photo, Movie, Article)
+    OfficialThroughModel, OfficialTag, Photo, Movie, Article, CustomManager)
 from taggit.utils import parse_tags, edit_string_for_tags
 
 
@@ -355,7 +359,6 @@ class TaggableManagerTestCase(BaseTaggingTestCase):
                 'apple': set(['1', '2'])
             })
 
-
 class TaggableManagerDirectTestCase(TaggableManagerTestCase):
     food_model = DirectFood
     pet_model = DirectPet
@@ -391,6 +394,16 @@ class TaggableManagerOfficialTestCase(TaggableManagerTestCase):
 
         self.assertEqual(apple, self.food_model.objects.get(tags__official=False))
 
+class TaggableManagerInitializationTestCase(TaggableManagerTestCase):
+    """Make sure manager override defaults and sets correctly."""
+    food_model = Food
+    custom_manager_model = CustomManager
+
+    def test_default_manager(self):
+        self.assertEqual(self.food_model.tags.__class__, _TaggableManager)
+
+    def test_custom_manager(self):
+        self.assertEqual(self.custom_manager_model.tags.__class__, CustomManager.Foo)
 
 class TaggableFormTestCase(BaseTaggingTestCase):
     form_class = FoodForm
@@ -538,3 +551,22 @@ class TagStringParseTestCase(UnitTestCase):
         self.assertEqual(edit_string_for_tags([plain, spaces, comma]), '"com,ma", "spa ces", plain')
         self.assertEqual(edit_string_for_tags([plain, comma]), '"com,ma", plain')
         self.assertEqual(edit_string_for_tags([comma, spaces]), '"com,ma", "spa ces"')
+
+
+@skipIf(django.VERSION < (1, 7), "not relevant for Django < 1.7")
+class DeconstructTestCase(UnitTestCase):
+    def test_deconstruct_kwargs_kept(self):
+        instance = TaggableManager(through=OfficialThroughModel)
+        name, path, args, kwargs = instance.deconstruct()
+        new_instance = TaggableManager(*args, **kwargs)
+        self.assertEqual(instance.rel.through, new_instance.rel.through)
+
+
+@skipUnless(django.VERSION < (1, 7), "test only applies to 1.6 and below")
+class SouthSupportTests(TestCase):
+    def test_import_migrations_module(self):
+        try:
+            from taggit.migrations import __doc__  # noqa
+        except ImproperlyConfigured as e:
+            exception = e
+        self.assertIn("SOUTH_MIGRATION_MODULES", exception.args[0])
